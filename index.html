@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#080b12">
+  <meta name="description" content="Liberty Link — community tools and services for ER:LC communities.">
+  <title>Liberty Link — Your community, connected.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <header class="site-header">
+    <a class="brand" href="#" aria-label="Liberty Link home">
+      <span class="brand-mark"><span></span><span></span><span></span></span>
+      <span>LIBERTY<span class="brand-light">LINK</span></span>
+    </a>
+    <nav class="desktop-nav" aria-label="Main navigation">
+      <a href="#services">Services</a>
+      <a href="#about">About</a>
+    </nav>
+    <div class="header-actions">
+      <button class="button button-ghost" data-auth="login">Log in</button>
+      <button class="button button-primary button-small" data-auth="signup">Get started <span aria-hidden="true">↗</span></button>
+      <button class="menu-toggle" aria-label="Open menu" aria-expanded="false"><span></span><span></span></button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="status-dot"></span> THE COMMUNITY CONNECTION PLATFORM</div>
+        <h1>Your community.<br><span>Connected.</span></h1>
+        <p class="hero-description">One place to bring your ER:LC community services together. Manage your tools, connect your Discord, and keep your community moving with Liberty Link.</p>
+        <div class="hero-actions">
+          <button class="button button-primary button-large" data-auth="signup">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 5.3a18.4 18.4 0 0 0-4.6-1.4l-.6 1.2a17 17 0 0 0-5 0l-.6-1.2a18.4 18.4 0 0 0-4.6 1.4C1.4 9.5.6 13.6 1 17.7a18.6 18.6 0 0 0 5.7 2.9l1.2-2a12 12 0 0 1-1.9-.9l.5-.4a13.2 13.2 0 0 0 11 0l.5.4a12 12 0 0 1-1.9.9l1.2 2a18.6 18.6 0 0 0 5.7-2.9c.5-4.8-.8-8.8-3.3-12.4ZM8.6 14.8c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm6.8 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"/></svg>
+            Sign up with Discord
+          </button>
+          <a class="text-link" href="#services">Explore services <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-note"><span class="mini-shield">✓</span> Simple access. One connected community.</div>
+      </div>
+
+      <div class="hero-visual" aria-label="Liberty Link platform preview">
+        <div class="visual-glow"></div>
+        <div class="dashboard-card">
+          <div class="dashboard-top">
+            <div class="window-dots"><i></i><i></i><i></i></div>
+            <span class="preview-label">LIBERTY LINK / OVERVIEW</span>
+            <span class="live-pill"><b></b> READY</span>
+          </div>
+          <div class="dashboard-content">
+            <div class="welcome-row">
+              <div><span class="muted-label">YOUR WORKSPACE</span><h3>Welcome to Liberty Link</h3></div>
+              <div class="avatar-placeholder">LL</div>
+            </div>
+            <div class="overview-grid">
+              <div class="overview-tile"><span class="tile-icon blue">⌘</span><span class="tile-title">Community tools</span><span class="tile-sub">All in one place</span></div>
+              <div class="overview-tile"><span class="tile-icon purple">◈</span><span class="tile-title">Discord connection</span><span class="tile-sub">Your community hub</span></div>
+            </div>
+            <div class="activity-panel">
+              <div class="activity-heading"><span>QUICK ACCESS</span><span class="tiny-tag">YOUR SPACE</span></div>
+              <div class="activity-line"><span class="activity-symbol">↗</span><span>Explore available services</span><span class="line-arrow">→</span></div>
+              <div class="activity-line"><span class="activity-symbol discord-symbol">◎</span><span>Connect your Discord account</span><span class="line-arrow">→</span></div>
+              <div class="activity-line"><span class="activity-symbol">⌁</span><span>Manage your community</span><span class="line-arrow">→</span></div>
+            </div>
+          </div>
+          <div class="dashboard-footer"><span><i></i> LIBERTY LINK</span><span>BUILT FOR COMMUNITIES</span></div>
+        </div>
+        <div class="floating-chip chip-top"><span class="chip-dot"></span> Your community, together</div>
+        <div class="floating-chip chip-bottom"><span class="discord-mini">◎</span> Discord-powered access</div>
+      </div>
+    </section>
+
+    <section class="services-section" id="services">
+      <div class="section-heading">
+        <div><div class="eyebrow"><span class="eyebrow-line"></span> WHAT YOU CAN DO</div><h2>Everything connected.<br><span>One destination.</span></h2></div>
+        <p>Liberty Link brings useful community services into one central place, with more capabilities becoming available as you connect.</p>
+      </div>
+      <div class="service-grid">
+        <article class="service-card">
+          <div class="service-icon icon-blue"><span>⌘</span></div>
+          <div class="service-number">01 / SERVICES</div>
+          <h3>Community tools</h3>
+          <p>Access Liberty Link services designed to make running and participating in ER:LC communities easier.</p>
+          <span class="card-accent"></span>
+        </article>
+        <article class="service-card">
+          <div class="service-icon icon-indigo"><span>◎</span></div>
+          <div class="service-number">02 / CONNECTION</div>
+          <h3>Discord connection</h3>
+          <p>Use your Discord account to create your Liberty Link account and access your workspace.</p>
+          <span class="card-accent"></span>
+        </article>
+        <article class="service-card">
+          <div class="service-icon icon-slate"><span>↗</span></div>
+          <div class="service-number">03 / INTEGRATION</div>
+          <h3>ER:LC integration</h3>
+          <p>Bring your Liberty Link experience closer to Emergency Response: Liberty County.</p>
+          <span class="card-accent"></span>
+        </article>
+      </div>
+    </section>
+
+    <section class="connect-section" id="about">
+      <div class="connect-panel">
+        <div class="connect-orbit orbit-one"></div><div class="connect-orbit orbit-two"></div>
+        <div class="connect-content">
+          <div class="eyebrow"><span class="status-dot"></span> GET CONNECTED</div>
+          <h2>Ready to link<br>your community?</h2>
+          <p>Create your Liberty Link account using Discord. No separate password to remember.</p>
+          <button class="button button-primary button-large" data-auth="signup">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 5.3a18.4 18.4 0 0 0-4.6-1.4l-.6 1.2a17 17 0 0 0-5 0l-.6-1.2a18.4 18.4 0 0 0-4.6 1.4C1.4 9.5.6 13.6 1 17.7a18.6 18.6 0 0 0 5.7 2.9l1.2-2a12 12 0 0 1-1.9-.9l.5-.4a13.2 13.2 0 0 0 11 0l.5.4a12 12 0 0 1-1.9.9l1.2 2a18.6 18.6 0 0 0 5.7-2.9c.5-4.8-.8-8.8-3.3-12.4ZM8.6 14.8c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Zm6.8 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"/></svg>
+            Continue with Discord
+          </button>
+        </div>
+        <div class="connect-side-mark"><span class="brand-mark large"><span></span><span></span><span></span></span><span>LIBERTY<br>LINK</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand footer-brand" href="#"><span class="brand-mark"><span></span><span></span><span></span></span><span>LIBERTY<span class="brand-light">LINK</span></span></a>
+    <span>Community tools, connected.</span>
+    <span class="copyright">© <span id="year"></span> Liberty Link</span>
+  </footer>
+
+  <div class="toast" id="auth-toast" role="status" aria-live="polite"></div>
+</body>
+</html>
