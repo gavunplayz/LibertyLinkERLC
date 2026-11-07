@@ -1,11 +1,11 @@
 const SITE_URL = "https://gavunplayz.github.io/LibertyLinkERLC";
+const SITE_ORIGIN = "https://gavunplayz.github.io";
 
 function corsHeaders(origin) {
   return {
-    "Access-Control-Allow-Origin": SITE_URL,
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Origin": origin === SITE_ORIGIN ? SITE_ORIGIN : SITE_ORIGIN,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Vary": "Origin"
   };
 }
@@ -20,11 +20,18 @@ function json(data, status = 200, origin = "") {
 function base64url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
 }
 
 function encodeText(value) {
   return base64url(new TextEncoder().encode(value));
+}
+
+function decodeText(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/") + "==".slice((value.length + 2) % 4);
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }
 
 async function sign(payload, secret) {
@@ -50,7 +57,7 @@ async function verify(token, secret) {
   const signature = Uint8Array.from(atob(parts[2].replace(/-/g, "+").replace(/_/g, "/") + "==".slice((parts[2].length + 2) % 4)), c => c.charCodeAt(0));
   const valid = await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(data));
   if (!valid) return null;
-  const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/") + "==".slice((parts[1].length + 2) % 4)));
+  const payload = JSON.parse(decodeText(parts[1]));
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
   return payload;
 }
@@ -71,8 +78,10 @@ export default {
     }
 
     if (url.pathname === "/login") {
-      const stateBytes = crypto.getRandomValues(new Uint8Array(32));
-      const state = base64url(stateBytes);
+      if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET || !env.SESSION_SECRET) {
+        return new Response("Authentication is not configured yet. Please add the required Worker secrets.", { status: 500 });
+      }
+      const state = base64url(crypto.getRandomValues(new Uint8Array(32)));
       const redirectUri = url.origin + "/callback";
       const authorize = new URL("https://discord.com/oauth2/authorize");
       authorize.search = new URLSearchParams({
@@ -98,6 +107,9 @@ export default {
       const savedState = getCookie(request, "ll_oauth_state");
       const clearState = "ll_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
 
+      if (url.searchParams.has("error")) {
+        return new Response("Discord sign-in was cancelled. You can close this page and try again.", { status: 400, headers: { "Set-Cookie": clearState } });
+      }
       if (!code || !returnedState || !savedState || returnedState !== savedState) {
         return new Response("Discord sign-in could not be verified. Please return to Liberty Link and try again.", { status: 400, headers: { "Set-Cookie": clearState } });
       }
@@ -147,7 +159,7 @@ export default {
     }
 
     if (url.pathname === "/me") {
-      if (origin !== SITE_URL) return json({ error: "Origin not allowed" }, 403, origin);
+      if (origin !== SITE_ORIGIN) return json({ error: "Origin not allowed" }, 403, origin);
       const authorization = request.headers.get("Authorization") || "";
       const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
       const user = token ? await verify(token, env.SESSION_SECRET) : null;
