@@ -2,6 +2,11 @@ name = "libertylink-auth"
 main = "worker.js"
 compatibility_date = "2026-11-07"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "libertylink-db"
+database_id = "76cef01b-4a36-419f-9463-42a48ad06f61"
+
 [vars]
 DISCORD_CLIENT_ID = "1527089890041528390"
 
