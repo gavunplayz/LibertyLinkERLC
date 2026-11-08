@@ -259,3 +259,89 @@ if (joinFromLink) {
   document.getElementById("directory").scrollIntoView({ behavior: "smooth" });
 }
 if (getSession()) loadServers();
+
+
+// Liberty Link public server profiles and staff dashboard
+const pageParams = new URLSearchParams(window.location.search);
+const pageServerId = pageParams.get("server");
+const pageView = pageParams.get("view");
+const serverPages = document.getElementById("server-pages");
+if (pageServerId && serverPages) {
+  document.querySelector("main")?.classList.add("server-page-mode");
+  serverPages.hidden = false;
+  document.querySelectorAll("main > section:not(#server-pages)").forEach(section => section.hidden = true);
+  loadServerPage();
+}
+async function loadServerPage() {
+  const title = document.getElementById("server-page-title");
+  const status = document.getElementById("server-page-status");
+  const description = document.getElementById("server-page-description");
+  const staffCount = document.getElementById("server-page-staff-count");
+  const announcement = document.getElementById("server-page-announcement");
+  try {
+    const data = await api("/api/public/" + encodeURIComponent(pageServerId));
+    const server = data.server;
+    title.textContent = server.name;
+    status.textContent = server.status === "online" ? "ONLINE" : "OFFLINE";
+    status.className = "server-status " + (server.status === "online" ? "is-online" : "is-offline");
+    description.textContent = server.description || "This community hasn't added a description yet.";
+    staffCount.textContent = String(server.staff_count ?? 0);
+    announcement.textContent = server.announcement || "No current announcements.";
+    document.title = server.name + " — Liberty Link";
+    document.getElementById("server-public-link").href = "?server=" + encodeURIComponent(pageServerId);
+    if (pageView === "staff") await loadStaffPage();
+  } catch (error) {
+    title.textContent = "Community not found";
+    description.textContent = error.message;
+  }
+}
+async function loadStaffPage() {
+  const panel = document.getElementById("staff-management");
+  panel.hidden = false;
+  try {
+    const data = await api("/api/staff/" + encodeURIComponent(pageServerId));
+    const server = data.server;
+    document.getElementById("staff-status").value = server.status;
+    document.getElementById("staff-count").value = server.staff_count ?? 0;
+    document.getElementById("staff-description").value = server.description || "";
+    document.getElementById("staff-announcement").value = server.announcement || "";
+    document.getElementById("staff-save-message").textContent = "Staff access verified.";
+  } catch (error) {
+    document.getElementById("staff-save-message").textContent = error.message;
+    document.getElementById("staff-settings-form").hidden = true;
+  }
+}
+document.getElementById("staff-settings-form")?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  const message = document.getElementById("staff-save-message");
+  message.textContent = "Saving changes...";
+  try {
+    await api("/api/staff/" + encodeURIComponent(pageServerId), {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: document.getElementById("staff-status").value,
+        staff_count: Number(document.getElementById("staff-count").value),
+        description: document.getElementById("staff-description").value,
+        announcement: document.getElementById("staff-announcement").value
+      })
+    });
+    message.textContent = "Changes saved!";
+    await loadServerPage();
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+document.getElementById("open-staff-page")?.addEventListener("click", () => {
+  if (!getSession()) {
+    window.location.href = AUTH_URL + "/login";
+    return;
+  }
+  window.location.href = "?server=" + encodeURIComponent(pageServerId) + "&view=staff";
+});
+document.getElementById("back-public-page")?.addEventListener("click", () => {
+  window.location.href = "?server=" + encodeURIComponent(pageServerId);
+});
