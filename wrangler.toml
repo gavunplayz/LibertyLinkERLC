@@ -4,3 +4,13 @@ compatibility_date = "2026-11-07"
 
 [vars]
 DISCORD_CLIENT_ID = "1527089890041528390"
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
