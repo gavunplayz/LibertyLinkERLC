@@ -88,3 +88,174 @@ if (returnedSession) {
   const existingSession = sessionStorage.getItem("ll_session");
   if (existingSession) loadCurrentUser(existingSession);
 }
+
+
+// Liberty Link server directory
+function getSession() {
+  return sessionStorage.getItem("ll_session") || "";
+}
+async function api(path, options = {}) {
+  const response = await fetch(AUTH_URL + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + getSession(),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+  return data;
+}
+function setMessage(id, message, isError = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = message;
+  el.classList.toggle("error", isError);
+}
+function showServerResult(server, joinUrl) {
+  const panel = document.getElementById("created-server-panel");
+  if (!panel) return;
+  panel.hidden = false;
+  panel.innerHTML = "";
+  const title = document.createElement("h3");
+  title.textContent = "Your server is ready!";
+  const description = document.createElement("p");
+  description.textContent = server.name + " is connected to Discord server " + server.discord_guild_name + ".";
+  const codeLabel = document.createElement("label");
+  codeLabel.textContent = "YOUR JOIN CODE";
+  const code = document.createElement("div");
+  code.className = "created-code";
+  code.textContent = server.join_code;
+  const linkLabel = document.createElement("label");
+  linkLabel.textContent = "INVITATION LINK";
+  const link = document.createElement("a");
+  link.href = joinUrl;
+  link.textContent = joinUrl;
+  link.target = "_blank";
+  link.rel = "noopener";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "button button-primary";
+  copy.textContent = "Copy invitation link";
+  copy.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(joinUrl);
+    copy.textContent = "Copied!";
+  });
+  panel.append(title, description, codeLabel, code, linkLabel, link, copy);
+  panel.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+async function loadGuildChoices() {
+  const select = document.getElementById("discord-guild");
+  if (!select) return;
+  select.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const data = await api("/api/guilds");
+    select.innerHTML = "";
+    if (!data.guilds.length) {
+      select.innerHTML = '<option value="">No manageable Discord servers found</option>';
+      return;
+    }
+    select.add(new Option("Select a Discord server", ""));
+    data.guilds.forEach(guild => select.add(new Option(guild.name, guild.id)));
+  } catch (error) {
+    select.innerHTML = '<option value="">Sign in to load Discord servers</option>';
+    setMessage("create-server-message", error.message, true);
+  }
+}
+async function loadServers() {
+  const dashboard = document.getElementById("server-dashboard");
+  const list = document.getElementById("server-list");
+  if (!dashboard || !list || !getSession()) return;
+  try {
+    const data = await api("/api/servers");
+    dashboard.hidden = false;
+    list.innerHTML = "";
+    if (!data.servers.length) {
+      const empty = document.createElement("p");
+      empty.className = "form-hint";
+      empty.textContent = "You haven't joined any Liberty Link servers yet.";
+      list.append(empty);
+      return;
+    }
+    data.servers.forEach(server => {
+      const card = document.createElement("article");
+      card.className = "server-list-card";
+      const name = document.createElement("strong");
+      name.textContent = server.name;
+      const discord = document.createElement("span");
+      discord.textContent = "Discord: " + server.discord_guild_name;
+      const role = document.createElement("span");
+      role.textContent = server.role;
+      card.append(name, discord, role);
+      list.append(card);
+    });
+  } catch (error) {
+    setMessage("join-message", error.message, true);
+  }
+}
+const createButton = document.getElementById("show-create-server");
+const createForm = document.getElementById("create-server-form");
+if (createButton && createForm) {
+  createButton.addEventListener("click", async () => {
+    if (!getSession()) {
+      showToast("Please sign in with Discord before creating a server.");
+      window.location.href = AUTH_URL + "/login";
+      return;
+    }
+    createForm.hidden = false;
+    await loadGuildChoices();
+    createForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+}
+document.getElementById("cancel-create-server")?.addEventListener("click", () => {
+  createForm.hidden = true;
+});
+document.getElementById("create-server-form")?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  button.disabled = true;
+  setMessage("create-server-message", "Creating your server...");
+  try {
+    const data = await api("/api/servers", {
+      method: "POST",
+      body: JSON.stringify({
+        name: document.getElementById("server-name").value,
+        discordGuildId: document.getElementById("discord-guild").value
+      })
+    });
+    showServerResult(data.server, data.join_url);
+    setMessage("create-server-message", "Server created successfully.");
+    await loadServers();
+  } catch (error) {
+    setMessage("create-server-message", error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+document.getElementById("join-server-form")?.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (!getSession()) {
+    showToast("Please sign in with Discord before joining a server.");
+    window.location.href = AUTH_URL + "/login";
+    return;
+  }
+  setMessage("join-message", "Checking invitation code...");
+  try {
+    const data = await api("/api/join", {
+      method: "POST",
+      body: JSON.stringify({ code: document.getElementById("join-code").value })
+    });
+    setMessage("join-message", "You joined " + data.server.name + "!");
+    await loadServers();
+  } catch (error) {
+    setMessage("join-message", error.message, true);
+  }
+});
+document.getElementById("refresh-servers")?.addEventListener("click", loadServers);
+const joinFromLink = new URLSearchParams(window.location.search).get("join");
+if (joinFromLink) {
+  document.getElementById("join-code").value = joinFromLink.toUpperCase();
+  document.getElementById("directory").scrollIntoView({ behavior: "smooth" });
+}
+if (getSession()) loadServers();
