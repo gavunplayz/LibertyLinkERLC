@@ -1,3 +1,6 @@
 name = "libertylink-auth"
 main = "worker.js"
 compatibility_date = "2026-11-07"
+
+[vars]
+DISCORD_CLIENT_ID = "1527089890041528390"
