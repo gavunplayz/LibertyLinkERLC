@@ -88,7 +88,7 @@ export default {
         client_id: env.DISCORD_CLIENT_ID,
         response_type: "code",
         redirect_uri: redirectUri,
-        scope: "identify",
+        scope: "identify guilds",
         state
       }).toString();
 
@@ -141,11 +141,22 @@ export default {
       }
 
       const user = await userResponse.json();
+      const guildResponse = await fetch("https://discord.com/api/users/@me/guilds", {
+        headers: { Authorization: "Bearer " + tokenData.access_token }
+      });
+      if (!guildResponse.ok) {
+        return new Response("Could not retrieve your Discord servers. Please authorize again.", { status: 502, headers: { "Set-Cookie": clearState } });
+      }
+      const discordGuilds = await guildResponse.json();
+      const manageableGuilds = discordGuilds
+        .filter(guild => guild.owner || (BigInt(guild.permissions || "0") & 32n) === 32n)
+        .map(guild => ({ id: guild.id, name: guild.name, icon: guild.icon || null }));
       const session = await sign({
         sub: user.id,
         username: user.username,
         global_name: user.global_name || user.username,
         avatar: user.avatar || null,
+        guilds: manageableGuilds,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7
       }, env.SESSION_SECRET);
 
@@ -156,6 +167,61 @@ export default {
           "Set-Cookie": clearState
         }
       });
+    }
+
+    if (url.pathname.startsWith("/api/")) {
+      const authorization = request.headers.get("Authorization") || "";
+      const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      let user;
+      try { user = token ? await verify(token, env.SESSION_SECRET) : null; }
+      catch { user = null; }
+      if (!user) return json({ error: "Please sign in again." }, 401, origin);
+      if (!env.DB) return json({ error: "Server database is not connected yet. Please try again after setup." }, 503, origin);
+
+      if (url.pathname === "/api/servers" && request.method === "GET") {
+        const rows = await env.DB.prepare(
+          "SELECT s.id, s.name, s.join_code, s.discord_guild_id, s.discord_guild_name, s.created_at, m.role FROM memberships m JOIN servers s ON s.id = m.server_id WHERE m.user_id = ? ORDER BY s.created_at DESC"
+        ).bind(user.sub).all();
+        return json({ servers: rows.results || [] }, 200, origin);
+      }
+
+      if (url.pathname === "/api/servers" && request.method === "POST") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "Invalid request body." }, 400, origin); }
+        const name = String(body.name || "").trim().slice(0, 48);
+        const guildId = String(body.discordGuildId || "");
+        if (name.length < 2) return json({ error: "Server name must be at least 2 characters." }, 400, origin);
+        const guild = (user.guilds || []).find(item => item.id === guildId);
+        if (!guild) return json({ error: "Choose a Discord server where you have Manage Server or Administrator permission. Sign in again to refresh your server list." }, 403, origin);
+        const id = crypto.randomUUID();
+        const codeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        const random = crypto.getRandomValues(new Uint8Array(8));
+        const code = Array.from(random, n => codeChars[n % codeChars.length]).join("");
+        try {
+          await env.DB.batch([
+            env.DB.prepare("INSERT INTO servers (id, name, owner_user_id, discord_guild_id, discord_guild_name, join_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+              .bind(id, name, user.sub, guild.id, guild.name, code, new Date().toISOString()),
+            env.DB.prepare("INSERT INTO memberships (server_id, user_id, role, joined_at) VALUES (?, ?, 'owner', ?)")
+              .bind(id, user.sub, new Date().toISOString())
+          ]);
+        } catch (error) {
+          return json({ error: "Could not create the server. Please try again." }, 500, origin);
+        }
+        return json({ server: { id, name, join_code: code, discord_guild_id: guild.id, discord_guild_name: guild.name, role: "owner" }, join_url: SITE_URL + "/?join=" + code }, 201, origin);
+      }
+
+      if (url.pathname === "/api/join" && request.method === "POST") {
+        let body;
+        try { body = await request.json(); } catch { return json({ error: "Invalid request body." }, 400, origin); }
+        const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (!code) return json({ error: "Enter a join code." }, 400, origin);
+        const server = await env.DB.prepare("SELECT id, name, join_code, discord_guild_name FROM servers WHERE join_code = ?").bind(code).first();
+        if (!server) return json({ error: "That join code was not found." }, 404, origin);
+        await env.DB.prepare("INSERT OR IGNORE INTO memberships (server_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)")
+          .bind(server.id, user.sub, new Date().toISOString()).run();
+        return json({ server }, 200, origin);
+      }
+      return json({ error: "API route not found." }, 404, origin);
     }
 
     if (url.pathname === "/me") {
