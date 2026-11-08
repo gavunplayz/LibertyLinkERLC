@@ -178,6 +178,10 @@ export default {
       if (!user) return json({ error: "Please sign in again." }, 401, origin);
       if (!env.DB) return json({ error: "Server database is not connected yet. Please try again after setup." }, 503, origin);
 
+      if (url.pathname === "/api/guilds" && request.method === "GET") {
+        return json({ guilds: user.guilds || [] }, 200, origin);
+      }
+
       if (url.pathname === "/api/servers" && request.method === "GET") {
         const rows = await env.DB.prepare(
           "SELECT s.id, s.name, s.join_code, s.discord_guild_id, s.discord_guild_name, s.created_at, m.role FROM memberships m JOIN servers s ON s.id = m.server_id WHERE m.user_id = ? ORDER BY s.created_at DESC"
