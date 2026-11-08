@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <script src="script.js?v=servers-v1" defer></script>
+  <script src="script.js?v=community-pages-v1" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -32,7 +32,30 @@
     </div>
   </header>
 
-  <main>
+  <main>\n
+    <section class="server-pages-section" id="server-pages" hidden>
+      <div class="server-page-top"><a class="brand" href="./">LIBERTY<span class="brand-light">LINK</span></a><a class="text-link" id="server-public-link" href="#">Public page ↗</a></div>
+      <div class="server-public-card">
+        <div class="eyebrow">LIBERTY LINK COMMUNITY</div>
+        <div class="server-public-heading"><h1 id="server-page-title">Loading community...</h1><span id="server-page-status" class="server-status">LOADING</span></div>
+        <p id="server-page-description" class="server-public-description">Loading community information...</p>
+        <div class="server-public-stats"><div><strong id="server-page-staff-count">—</strong><span>STAFF MEMBERS</span></div><div><strong>ER:LC</strong><span>COMMUNITY PLATFORM</span></div></div>
+        <div class="server-announcement"><span class="eyebrow">LATEST ANNOUNCEMENT</span><p id="server-page-announcement">Loading...</p></div>
+        <button class="button button-primary" id="open-staff-page" type="button">Staff sign in</button>
+      </div>
+      <div class="staff-management" id="staff-management" hidden>
+        <div class="eyebrow">STAFF CONTROL PANEL</div><h2>Manage your community</h2>
+        <form id="staff-settings-form">
+          <label for="staff-status">SERVER STATUS</label><select id="staff-status"><option value="online">Online</option><option value="offline">Offline</option></select>
+          <label for="staff-count">TOTAL STAFF COUNT</label><input id="staff-count" type="number" min="0" max="100000" required>
+          <label for="staff-description">PUBLIC DESCRIPTION</label><textarea id="staff-description" maxlength="500" rows="4"></textarea>
+          <label for="staff-announcement">PUBLIC ANNOUNCEMENT</label><textarea id="staff-announcement" maxlength="300" rows="3"></textarea>
+          <button class="button button-primary" type="submit">Save changes</button><p id="staff-save-message" class="form-message" aria-live="polite"></p>
+        </form>
+        <button class="button button-ghost" id="back-public-page" type="button">Back to public page</button>
+      </div>
+    </section>
+
     <section class="hero">
       <div class="hero-copy">
         <div class="eyebrow"><span class="status-dot"></span> THE COMMUNITY CONNECTION PLATFORM</div>
