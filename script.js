@@ -187,7 +187,18 @@ async function loadServers() {
       discord.textContent = "Discord: " + server.discord_guild_name;
       const role = document.createElement("span");
       role.textContent = server.role;
-      card.append(name, discord, role);
+      const publicLink = document.createElement("a");
+      publicLink.href = "?server=" + encodeURIComponent(server.id);
+      publicLink.textContent = "View public page ↗";
+      publicLink.className = "server-page-link";
+      card.append(name, discord, role, publicLink);
+      if (server.role === "owner" || server.role === "staff") {
+        const staffLink = document.createElement("a");
+        staffLink.href = "?server=" + encodeURIComponent(server.id) + "&view=staff";
+        staffLink.textContent = "Open staff page →";
+        staffLink.className = "server-page-link";
+        card.append(staffLink);
+      }
       list.append(card);
     });
   } catch (error) {
