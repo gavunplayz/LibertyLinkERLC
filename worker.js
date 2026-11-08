@@ -4,7 +4,7 @@ const SITE_ORIGIN = "https://gavunplayz.github.io";
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin === SITE_ORIGIN ? SITE_ORIGIN : SITE_ORIGIN,
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Vary": "Origin"
   };
@@ -170,6 +170,15 @@ export default {
     }
 
     if (url.pathname.startsWith("/api/")) {
+      if (url.pathname.startsWith("/api/public/") && request.method === "GET") {
+        if (!env.DB) return json({ error: "Server database is not connected." }, 503, origin);
+        const serverId = url.pathname.split("/").pop();
+        const server = await env.DB.prepare(
+          "SELECT id, name, discord_guild_name, status, staff_count, description, announcement, created_at FROM servers WHERE id = ?"
+        ).bind(serverId).first();
+        if (!server) return json({ error: "Server not found." }, 404, origin);
+        return json({ server }, 200, origin);
+      }
       const authorization = request.headers.get("Authorization") || "";
       const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
       let user;
@@ -177,6 +186,33 @@ export default {
       catch { user = null; }
       if (!user) return json({ error: "Please sign in again." }, 401, origin);
       if (!env.DB) return json({ error: "Server database is not connected yet. Please try again after setup." }, 503, origin);
+
+
+      const staffMatch = url.pathname.match(/^\/api\/staff\/([a-f0-9-]+)$/i);
+      if (staffMatch) {
+        const serverId = staffMatch[1];
+        const membership = await env.DB.prepare(
+          "SELECT m.role, s.id, s.name, s.status, s.staff_count, s.description, s.announcement, s.discord_guild_name FROM memberships m JOIN servers s ON s.id = m.server_id WHERE m.server_id = ? AND m.user_id = ?"
+        ).bind(serverId, user.sub).first();
+        if (!membership || !["owner", "staff"].includes(membership.role)) {
+          return json({ error: "You need server staff permissions to access this page." }, 403, origin);
+        }
+        if (request.method === "GET") return json({ server: membership }, 200, origin);
+        if (request.method === "PATCH") {
+          let body;
+          try { body = await request.json(); } catch { return json({ error: "Invalid request body." }, 400, origin); }
+          const status = String(body.status || "").toLowerCase();
+          const staffCount = Number(body.staff_count);
+          const description = String(body.description || "").trim().slice(0, 500);
+          const announcement = String(body.announcement || "").trim().slice(0, 300);
+          if (!["online", "offline"].includes(status)) return json({ error: "Choose online or offline status." }, 400, origin);
+          if (!Number.isInteger(staffCount) || staffCount < 0 || staffCount > 100000) return json({ error: "Staff count must be a whole number from 0 to 100000." }, 400, origin);
+          await env.DB.prepare(
+            "UPDATE servers SET status = ?, staff_count = ?, description = ?, announcement = ? WHERE id = ?"
+          ).bind(status, staffCount, description, announcement, serverId).run();
+          return json({ success: true }, 200, origin);
+        }
+      }
 
       if (url.pathname === "/api/guilds" && request.method === "GET") {
         return json({ guilds: user.guilds || [] }, 200, origin);
