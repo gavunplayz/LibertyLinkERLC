@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <script src="script.js?v=discord-auth-2" defer></script>
+  <script src="script.js?v=servers-v1" defer></script>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -77,6 +77,41 @@
         <div class="floating-chip chip-top"><span class="chip-dot"></span> Your community, together</div>
         <div class="floating-chip chip-bottom"><span class="discord-mini">◎</span> Discord-powered access</div>
       </div>
+    </section>
+
+    <section class="directory-section" id="directory">
+      <div class="directory-heading">
+        <div><div class="eyebrow"><span class="eyebrow-line"></span> LIBERTY LINK DIRECTORY</div><h2>Find your <span>community.</span></h2></div>
+        <p>Join an existing Liberty Link server with an invitation code, or create a new community workspace.</p>
+      </div>
+      <div class="directory-grid">
+        <form class="directory-card" id="join-server-form">
+          <div class="directory-card-icon">↗</div><h3>Join a server</h3>
+          <p>Have an invitation code? Enter it below to join a community.</p>
+          <label for="join-code">SERVER JOIN CODE</label>
+          <div class="join-input-row"><input id="join-code" name="code" maxlength="12" placeholder="EXAMPLE8" autocomplete="off" required><button class="button button-primary" type="submit">Join</button></div>
+          <div class="form-message" id="join-message" aria-live="polite"></div>
+        </form>
+        <div class="directory-card">
+          <div class="directory-card-icon">＋</div><h3>Create a server</h3>
+          <p>Connect a Liberty Link workspace to a Discord server you manage.</p>
+          <button class="button button-primary" id="show-create-server" type="button">Create a server</button>
+          <div class="form-message" id="create-message" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="server-dashboard" id="server-dashboard" hidden>
+        <div class="server-dashboard-heading"><div><div class="eyebrow">YOUR COMMUNITIES</div><h3>Your servers</h3></div><button class="button button-ghost" id="refresh-servers" type="button">Refresh</button></div>
+        <div id="server-list" class="server-list"></div>
+      </div>
+      <form class="create-server-panel" id="create-server-form" hidden>
+        <div class="server-dashboard-heading"><div><div class="eyebrow">NEW WORKSPACE</div><h3>Create your server</h3></div><button class="button button-ghost" id="cancel-create-server" type="button">Close</button></div>
+        <label for="server-name">LIBERTY LINK SERVER NAME</label><input id="server-name" maxlength="48" minlength="2" placeholder="My ER:LC Community" required>
+        <label for="discord-guild">CONNECT DISCORD SERVER</label><select id="discord-guild" required><option value="">Loading your manageable Discord servers...</option></select>
+        <p class="form-hint">Only Discord servers where you have Manage Server or Administrator permission are available. If you just granted access, sign out and back in to refresh the list.</p>
+        <button class="button button-primary" type="submit">Create Liberty Link server</button>
+        <div class="form-message" id="create-server-message" aria-live="polite"></div>
+      </form>
+      <div class="created-server-panel" id="created-server-panel" hidden></div>
     </section>
 
     <section class="services-section" id="services">
