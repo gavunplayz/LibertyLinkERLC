@@ -41,6 +41,7 @@
         <div class="server-public-heading"><h1 id="server-page-title">Loading community...</h1><span id="server-page-status" class="server-status">LOADING</span></div>
         <p id="server-page-description" class="server-public-description">Loading community information...</p>
         <div class="server-public-stats"><div><strong id="server-page-staff-count">—</strong><span>STAFF MEMBERS</span></div><div><strong id="server-page-member-count">—</strong><span>DISCORD MEMBERS</span></div></div>
+        <div class="server-current-activity" id="server-current-activity" hidden><span class="eyebrow">CURRENTLY HAPPENING</span><p id="server-page-current-activity"></p></div>
         <div class="server-announcement"><span class="eyebrow">LATEST ANNOUNCEMENT</span><p id="server-page-announcement">Loading...</p></div>
         <button class="button button-primary" id="open-staff-page" type="button">Staff sign in</button>
       </div>
@@ -52,6 +53,7 @@
           <div id="whitelist-role-setting"><label for="whitelisted-role">DISCORD WHITELIST ROLE</label><select id="whitelisted-role"><option value="">Select a Discord role</option></select><p class="form-hint">When status is Whitelisted, only members with this role, staff, and the owner will see it as Whitelisted. Everyone else sees Offline.</p></div>
           <label for="staff-description">PUBLIC DESCRIPTION</label><textarea id="staff-description" maxlength="500" rows="4"></textarea>
           <label for="staff-announcement">PUBLIC ANNOUNCEMENT</label><textarea id="staff-announcement" maxlength="300" rows="3"></textarea>
+          <label for="staff-current-activity">CURRENT ACTIVITY (SHOWN ONLY WHEN ONLINE)</label><input id="staff-current-activity" type="text" maxlength="100" placeholder="e.g. Race in Springfield">
           <button class="button button-primary" type="submit">Save changes</button><p id="staff-save-message" class="form-message" aria-live="polite"></p>
         </form>
         <button class="button button-ghost" id="back-public-page" type="button">Back to public page</button>
