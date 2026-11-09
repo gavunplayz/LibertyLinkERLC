@@ -114,6 +114,110 @@ async function refreshDiscordCounts(env, server) {
   }
 }
 
+
+function hexToBytes(hex) {
+  if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) throw new Error("Invalid hex value.");
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return bytes;
+}
+
+async function verifyDiscordRequest(request, rawBody, publicKey) {
+  const signature = request.headers.get("X-Signature-Ed25519") || "";
+  const timestamp = request.headers.get("X-Signature-Timestamp") || "";
+  if (!publicKey || !signature || !timestamp || !/^\\d+$/.test(timestamp)) return false;
+  const seconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(seconds - Number(timestamp)) > 300) return false;
+  try {
+    const key = await crypto.subtle.importKey("raw", hexToBytes(publicKey), { name: "Ed25519" }, false, ["verify"]);
+    return await crypto.subtle.verify("Ed25519", key, hexToBytes(signature), new TextEncoder().encode(timestamp + rawBody));
+  } catch (error) {
+    console.error("Discord signature verification failed:", error);
+    return false;
+  }
+}
+
+function discordReply(content) {
+  return new Response(JSON.stringify({
+    type: 4,
+    data: { content, flags: 64 }
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+async function handleDiscordInteraction(request, env) {
+  const rawBody = await request.text();
+  if (!await verifyDiscordRequest(request, rawBody, env.DISCORD_PUBLIC_KEY)) {
+    return new Response("Invalid Discord request signature.", { status: 401 });
+  }
+
+  let interaction;
+  try { interaction = JSON.parse(rawBody); }
+  catch { return new Response("Invalid JSON.", { status: 400 }); }
+
+  if (interaction.type === 1) {
+    return new Response(JSON.stringify({ type: 1 }), {
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+  if (interaction.type !== 2) return discordReply("That interaction is not supported.");
+  if (!env.DB) return discordReply("Liberty Link's database is unavailable right now.");
+
+  const guildId = String(interaction.guild_id || "");
+  const userId = String(interaction.member?.user?.id || interaction.user?.id || "");
+  if (!guildId || !userId) return discordReply("Use Liberty Link commands inside your connected Discord server, not in direct messages.");
+
+  const server = await env.DB.prepare(
+    "SELECT id, name, owner_user_id, discord_guild_id, status, current_activity, staff_role_id, whitelisted_role_id FROM servers WHERE discord_guild_id = ?"
+  ).bind(guildId).first();
+
+  if (!server) return discordReply("This Discord server is not connected to a Liberty Link community.");
+
+  const isOwner = server.owner_user_id === userId;
+  const memberRoles = Array.isArray(interaction.member?.roles) ? interaction.member.roles : [];
+  const isStaff = !!server.staff_role_id && memberRoles.includes(server.staff_role_id);
+  if (!isOwner && !isStaff) {
+    return discordReply("You do not have permission to use this command. You need the staff role selected by the community owner on the Liberty Link website.");
+  }
+
+  const command = interaction.data?.name;
+  const options = interaction.data?.options || [];
+  const option = options.find(item => item.name === "value" || item.name === "text");
+  const now = new Date().toISOString();
+
+  if (command === "status") {
+    const status = String(option?.value || "").toLowerCase();
+    if (!["online", "offline", "whitelisted"].includes(status)) {
+      return discordReply("Choose Online, Offline, or Whitelisted.");
+    }
+    if (status === "whitelisted" && !server.whitelisted_role_id) {
+      return discordReply("A whitelist role has not been selected on the Liberty Link website yet. Ask the community owner to configure it first.");
+    }
+    await env.DB.prepare("UPDATE servers SET status = ?, discord_synced_at = NULL WHERE id = ?")
+      .bind(status, server.id).run();
+    await env.DB.prepare(
+      "INSERT INTO server_audit_log (server_id, actor_user_id, action, old_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(server.id, userId, "status", server.status || "", status, now).run();
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    return discordReply(server.name + " status has been set to " + label + ".");
+  }
+
+  if (command === "activity") {
+    const supplied = String(option?.value || "").trim();
+    const activity = supplied.toLowerCase() === "clear" ? "" : supplied.slice(0, 100);
+    if (!supplied) return discordReply("Enter an activity, or type CLEAR to remove the current activity.");
+    await env.DB.prepare("UPDATE servers SET current_activity = ? WHERE id = ?")
+      .bind(activity, server.id).run();
+    await env.DB.prepare(
+      "INSERT INTO server_audit_log (server_id, actor_user_id, action, old_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(server.id, userId, "activity", server.current_activity || "", activity, now).run();
+    return discordReply(activity
+      ? "Current activity updated to: " + activity
+      : "The current activity has been cleared.");
+  }
+
+  return discordReply("Unknown Liberty Link command.");
+}
+
 function getCookie(request, name) {
   const cookie = request.headers.get("Cookie") || "";
   const match = cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
@@ -124,6 +228,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin") || "";
+
+    if (url.pathname === "/discord/interactions" && request.method === "POST") {
+      return handleDiscordInteraction(request, env);
+    }
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
