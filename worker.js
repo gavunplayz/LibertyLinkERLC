@@ -313,7 +313,8 @@ export default {
           const description = String(body.description || "").trim().slice(0, 500);
           const announcement = String(body.announcement || "").trim().slice(0, 300);
           if (!["online", "offline", "whitelisted"].includes(status)) return json({ error: "Choose online, whitelisted, or offline status." }, 400, origin);
-          if (status === "whitelisted" && !String(body.whitelisted_role_id || server.whitelisted_role_id || "")) return json({ error: "Select a Discord whitelist role before setting the server to Whitelisted." }, 400, origin);
+          const requestedWhitelistRole = Object.prototype.hasOwnProperty.call(body, "whitelisted_role_id") ? String(body.whitelisted_role_id || "") : String(server.whitelisted_role_id || "");
+          if (status === "whitelisted" && !requestedWhitelistRole) return json({ error: "Select a Discord whitelist role before setting the server to Whitelisted." }, 400, origin);
           let staffRoleId = server.staff_role_id;
           let whitelistedRoleId = server.whitelisted_role_id;
           if (Object.prototype.hasOwnProperty.call(body, "staff_role_id") || Object.prototype.hasOwnProperty.call(body, "whitelisted_role_id")) {
