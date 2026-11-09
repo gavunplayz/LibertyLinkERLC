@@ -294,8 +294,8 @@ async function loadServerPage() {
     const data = await api("/api/public/" + encodeURIComponent(pageServerId));
     const server = data.server;
     title.textContent = server.name;
-    status.textContent = server.status === "online" ? "ONLINE" : "OFFLINE";
-    status.className = "server-status " + (server.status === "online" ? "is-online" : "is-offline");
+    status.textContent = server.status === "online" ? "ONLINE" : server.status === "whitelisted" ? "WHITELISTED" : "OFFLINE";
+    status.className = "server-status " + (server.status === "online" ? "is-online" : server.status === "whitelisted" ? "is-whitelisted" : "is-offline");
     description.textContent = server.description || "This community hasn't added a description yet.";
     staffCount.textContent = String(server.staff_count ?? 0);
     if (memberCount) memberCount.textContent = String(server.discord_member_count ?? 0);
@@ -322,8 +322,15 @@ async function loadStaffPage() {
       roleSelect.innerHTML = '<option value="">No staff role selected</option>';
       data.roles.forEach(role => roleSelect.add(new Option(role.name, role.id)));
       roleSelect.value = server.staff_role_id || "";
+      const whitelistSetting = document.getElementById("whitelist-role-setting");
+      const whitelistSelect = document.getElementById("whitelisted-role");
+      whitelistSetting.hidden = false;
+      whitelistSelect.innerHTML = '<option value="">No whitelist role selected</option>';
+      data.roles.forEach(role => whitelistSelect.add(new Option(role.name, role.id)));
+      whitelistSelect.value = server.whitelisted_role_id || "";
     } else {
       roleSetting.hidden = true;
+      document.getElementById("whitelist-role-setting").hidden = true;
     }
     document.getElementById("staff-description").value = server.description || "";
     document.getElementById("staff-announcement").value = server.announcement || "";
@@ -344,7 +351,7 @@ document.getElementById("staff-settings-form")?.addEventListener("submit", async
       method: "PATCH",
       body: JSON.stringify({
         status: document.getElementById("staff-status").value,
-        ...(document.getElementById("staff-role-setting").hidden ? {} : { staff_role_id: document.getElementById("staff-role").value }),
+        ...(document.getElementById("staff-role-setting").hidden ? {} : { staff_role_id: document.getElementById("staff-role").value, whitelisted_role_id: document.getElementById("whitelisted-role").value }),
         description: document.getElementById("staff-description").value,
         announcement: document.getElementById("staff-announcement").value
       })
