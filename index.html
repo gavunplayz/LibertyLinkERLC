@@ -47,8 +47,9 @@
       <div class="staff-management" id="staff-management" hidden>
         <div class="eyebrow">STAFF CONTROL PANEL</div><h2>Manage your community</h2>
         <form id="staff-settings-form">
-          <label for="staff-status">SERVER STATUS</label><select id="staff-status"><option value="online">Online</option><option value="offline">Offline</option></select>
+          <label for="staff-status">SERVER STATUS</label><select id="staff-status"><option value="offline">Offline</option><option value="whitelisted">Whitelisted</option><option value="online">Online</option></select>
           <div id="staff-role-setting"><label for="staff-role">DISCORD STAFF ROLE</label><select id="staff-role"><option value="">Select a Discord role</option></select><p class="form-hint">Members with this Discord role can access the staff page. Staff count is calculated automatically.</p></div>
+          <div id="whitelist-role-setting"><label for="whitelisted-role">DISCORD WHITELIST ROLE</label><select id="whitelisted-role"><option value="">Select a Discord role</option></select><p class="form-hint">When status is Whitelisted, only members with this role, staff, and the owner will see it as Whitelisted. Everyone else sees Offline.</p></div>
           <label for="staff-description">PUBLIC DESCRIPTION</label><textarea id="staff-description" maxlength="500" rows="4"></textarea>
           <label for="staff-announcement">PUBLIC ANNOUNCEMENT</label><textarea id="staff-announcement" maxlength="300" rows="3"></textarea>
           <button class="button button-primary" type="submit">Save changes</button><p id="staff-save-message" class="form-message" aria-live="polite"></p>
