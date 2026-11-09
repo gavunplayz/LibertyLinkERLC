@@ -125,7 +125,7 @@ function hexToBytes(hex) {
 async function verifyDiscordRequest(request, rawBody, publicKey) {
   const signature = request.headers.get("X-Signature-Ed25519") || "";
   const timestamp = request.headers.get("X-Signature-Timestamp") || "";
-  if (!publicKey || !signature || !timestamp || !/^\\d+$/.test(timestamp)) return false;
+  if (!publicKey || !signature || !timestamp || !/^\d+$/.test(timestamp)) return false;
   const seconds = Math.floor(Date.now() / 1000);
   if (Math.abs(seconds - Number(timestamp)) > 300) return false;
   try {
