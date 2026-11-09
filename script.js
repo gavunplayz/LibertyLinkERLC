@@ -290,6 +290,8 @@ async function loadServerPage() {
   const staffCount = document.getElementById("server-page-staff-count");
   const memberCount = document.getElementById("server-page-member-count");
   const announcement = document.getElementById("server-page-announcement");
+  const activityPanel = document.getElementById("server-current-activity");
+  const activityText = document.getElementById("server-page-current-activity");
   try {
     const data = await api("/api/public/" + encodeURIComponent(pageServerId));
     const server = data.server;
@@ -300,6 +302,11 @@ async function loadServerPage() {
     staffCount.textContent = String(server.staff_count ?? 0);
     if (memberCount) memberCount.textContent = String(server.discord_member_count ?? 0);
     announcement.textContent = server.announcement || "No current announcements.";
+    if (activityPanel && activityText) {
+      const showActivity = server.status === "online" && !!String(server.current_activity || "").trim();
+      activityText.textContent = showActivity ? server.current_activity : "";
+      activityPanel.hidden = !showActivity;
+    }
     document.title = server.name + " — Liberty Link";
     document.getElementById("server-public-link").href = "?server=" + encodeURIComponent(pageServerId);
     if (pageView === "staff") await loadStaffPage();
@@ -334,6 +341,7 @@ async function loadStaffPage() {
     }
     document.getElementById("staff-description").value = server.description || "";
     document.getElementById("staff-announcement").value = server.announcement || "";
+    document.getElementById("staff-current-activity").value = server.current_activity || "";
     document.getElementById("staff-save-message").textContent = "Staff access verified.";
   } catch (error) {
     document.getElementById("staff-save-message").textContent = error.message;
@@ -353,7 +361,8 @@ document.getElementById("staff-settings-form")?.addEventListener("submit", async
         status: document.getElementById("staff-status").value,
         ...(document.getElementById("staff-role-setting").hidden ? {} : { staff_role_id: document.getElementById("staff-role").value, whitelisted_role_id: document.getElementById("whitelisted-role").value }),
         description: document.getElementById("staff-description").value,
-        announcement: document.getElementById("staff-announcement").value
+        announcement: document.getElementById("staff-announcement").value,
+        current_activity: document.getElementById("staff-current-activity").value
       })
     });
     message.textContent = "Changes saved!";
