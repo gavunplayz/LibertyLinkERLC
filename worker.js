@@ -226,7 +226,7 @@ export default {
         if (!env.DB) return json({ error: "Server database is not connected." }, 503, origin);
         const serverId = url.pathname.split("/").pop();
         let server = await env.DB.prepare(
-          "SELECT id, name, owner_user_id, discord_guild_id, discord_guild_name, status, staff_count, discord_member_count, description, announcement, created_at, staff_role_id, whitelisted_role_id, discord_synced_at FROM servers WHERE id = ?"
+          "SELECT id, name, owner_user_id, discord_guild_id, discord_guild_name, status, staff_count, discord_member_count, description, announcement, current_activity, server_type, created_at, staff_role_id, whitelisted_role_id, discord_synced_at FROM servers WHERE id = ?"
         ).bind(serverId).first();
         if (!server) return json({ error: "Server not found." }, 404, origin);
         server = await refreshDiscordCounts(env, server);
@@ -255,6 +255,7 @@ export default {
         delete server.whitelisted_role_id;
         delete server.discord_synced_at;
         server.status = visibleStatus;
+        if (visibleStatus !== "online") server.current_activity = "";
         return json({ server }, 200, origin);
       }
       const authorization = request.headers.get("Authorization") || "";
@@ -270,7 +271,7 @@ export default {
       if (staffMatch) {
         const serverId = staffMatch[1];
         let server = await env.DB.prepare(
-          "SELECT id, name, owner_user_id, discord_guild_id, status, staff_count, discord_member_count, description, announcement, discord_guild_name, staff_role_id, whitelisted_role_id, discord_synced_at FROM servers WHERE id = ?"
+          "SELECT id, name, owner_user_id, discord_guild_id, status, staff_count, discord_member_count, description, announcement, current_activity, server_type, discord_guild_name, staff_role_id, whitelisted_role_id, discord_synced_at FROM servers WHERE id = ?"
         ).bind(serverId).first();
         if (!server) return json({ error: "Server not found." }, 404, origin);
         const isOwner = server.owner_user_id === user.sub;
@@ -312,6 +313,7 @@ export default {
           const status = String(body.status || "").toLowerCase();
           const description = String(body.description || "").trim().slice(0, 500);
           const announcement = String(body.announcement || "").trim().slice(0, 300);
+          const currentActivity = String(body.current_activity || "").trim().slice(0, 100);
           if (!["online", "offline", "whitelisted"].includes(status)) return json({ error: "Choose online, whitelisted, or offline status." }, 400, origin);
           const requestedWhitelistRole = Object.prototype.hasOwnProperty.call(body, "whitelisted_role_id") ? String(body.whitelisted_role_id || "") : String(server.whitelisted_role_id || "");
           if (status === "whitelisted" && !requestedWhitelistRole) return json({ error: "Select a Discord whitelist role before setting the server to Whitelisted." }, 400, origin);
@@ -329,8 +331,8 @@ export default {
             }
           }
           await env.DB.prepare(
-            "UPDATE servers SET status = ?, description = ?, announcement = ?, staff_role_id = ?, whitelisted_role_id = ?, discord_synced_at = NULL WHERE id = ?"
-          ).bind(status, description, announcement, staffRoleId, whitelistedRoleId, serverId).run();
+            "UPDATE servers SET status = ?, description = ?, announcement = ?, current_activity = ?, staff_role_id = ?, whitelisted_role_id = ?, discord_synced_at = NULL WHERE id = ?"
+          ).bind(status, description, announcement, currentActivity, staffRoleId, whitelistedRoleId, serverId).run();
           return json({ success: true }, 200, origin);
         }
       }
@@ -360,7 +362,7 @@ export default {
         const code = Array.from(random, n => codeChars[n % codeChars.length]).join("");
         try {
           await env.DB.batch([
-            env.DB.prepare("INSERT INTO servers (id, name, owner_user_id, discord_guild_id, discord_guild_name, join_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            env.DB.prepare("INSERT INTO servers (id, name, owner_user_id, discord_guild_id, discord_guild_name, join_code, created_at, server_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'normal')")
               .bind(id, name, user.sub, guild.id, guild.name, code, new Date().toISOString()),
             env.DB.prepare("INSERT INTO memberships (server_id, user_id, role, joined_at) VALUES (?, ?, 'owner', ?)")
               .bind(id, user.sub, new Date().toISOString())
