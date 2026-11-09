@@ -226,13 +226,35 @@ export default {
         if (!env.DB) return json({ error: "Server database is not connected." }, 503, origin);
         const serverId = url.pathname.split("/").pop();
         let server = await env.DB.prepare(
-          "SELECT id, name, discord_guild_id, discord_guild_name, status, staff_count, discord_member_count, description, announcement, created_at, staff_role_id, discord_synced_at FROM servers WHERE id = ?"
+          "SELECT id, name, owner_user_id, discord_guild_id, discord_guild_name, status, staff_count, discord_member_count, description, announcement, created_at, staff_role_id, whitelisted_role_id, discord_synced_at FROM servers WHERE id = ?"
         ).bind(serverId).first();
         if (!server) return json({ error: "Server not found." }, 404, origin);
         server = await refreshDiscordCounts(env, server);
+        let visibleStatus = server.status;
+        if (server.status === "whitelisted") {
+          const authorization = request.headers.get("Authorization") || "";
+          const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+          let viewer = null;
+          try { viewer = token ? await verify(token, env.SESSION_SECRET) : null; } catch { viewer = null; }
+          let allowed = !!viewer && viewer.sub === server.owner_user_id;
+          if (viewer && !allowed && env.DISCORD_BOT_TOKEN && (server.whitelisted_role_id || server.staff_role_id)) {
+            try {
+              const member = await getDiscordMember(env, server.discord_guild_id, viewer.sub);
+              const roles = member && Array.isArray(member.roles) ? member.roles : [];
+              allowed = roles.includes(server.whitelisted_role_id) || roles.includes(server.staff_role_id);
+            } catch (error) {
+              console.error("Whitelist status check failed:", error);
+              allowed = false;
+            }
+          }
+          if (!allowed) visibleStatus = "offline";
+        }
+        delete server.owner_user_id;
         delete server.discord_guild_id;
         delete server.staff_role_id;
+        delete server.whitelisted_role_id;
         delete server.discord_synced_at;
+        server.status = visibleStatus;
         return json({ server }, 200, origin);
       }
       const authorization = request.headers.get("Authorization") || "";
@@ -248,7 +270,7 @@ export default {
       if (staffMatch) {
         const serverId = staffMatch[1];
         let server = await env.DB.prepare(
-          "SELECT id, name, owner_user_id, discord_guild_id, status, staff_count, discord_member_count, description, announcement, discord_guild_name, staff_role_id, discord_synced_at FROM servers WHERE id = ?"
+          "SELECT id, name, owner_user_id, discord_guild_id, status, staff_count, discord_member_count, description, announcement, discord_guild_name, staff_role_id, whitelisted_role_id, discord_synced_at FROM servers WHERE id = ?"
         ).bind(serverId).first();
         if (!server) return json({ error: "Server not found." }, 404, origin);
         const isOwner = server.owner_user_id === user.sub;
@@ -290,21 +312,23 @@ export default {
           const status = String(body.status || "").toLowerCase();
           const description = String(body.description || "").trim().slice(0, 500);
           const announcement = String(body.announcement || "").trim().slice(0, 300);
-          if (!["online", "offline"].includes(status)) return json({ error: "Choose online or offline status." }, 400, origin);
+          if (!["online", "offline", "whitelisted"].includes(status)) return json({ error: "Choose online, whitelisted, or offline status." }, 400, origin);
           let staffRoleId = server.staff_role_id;
-          if (Object.prototype.hasOwnProperty.call(body, "staff_role_id")) {
+          let whitelistedRoleId = server.whitelisted_role_id;
+          if (Object.prototype.hasOwnProperty.call(body, "staff_role_id") || Object.prototype.hasOwnProperty.call(body, "whitelisted_role_id")) {
             if (!isOwner) return json({ error: "Only the community owner can change the staff role." }, 403, origin);
-            staffRoleId = String(body.staff_role_id || "") || null;
-            if (staffRoleId) {
-              const roles = await discordBotFetch(env, "/guilds/" + encodeURIComponent(server.discord_guild_id) + "/roles");
-              if (!roles.some(role => role.id === staffRoleId && !role.managed && role.name !== "@everyone")) {
-                return json({ error: "Choose a valid role from this Discord server." }, 400, origin);
+            if (Object.prototype.hasOwnProperty.call(body, "staff_role_id")) staffRoleId = String(body.staff_role_id || "") || null;
+            if (Object.prototype.hasOwnProperty.call(body, "whitelisted_role_id")) whitelistedRoleId = String(body.whitelisted_role_id || "") || null;
+            const roles = await discordBotFetch(env, "/guilds/" + encodeURIComponent(server.discord_guild_id) + "/roles");
+            for (const selectedRoleId of [staffRoleId, whitelistedRoleId]) {
+              if (selectedRoleId && !roles.some(role => role.id === selectedRoleId && !role.managed && role.name !== "@everyone")) {
+                return json({ error: "Choose valid roles from this Discord server." }, 400, origin);
               }
             }
           }
           await env.DB.prepare(
-            "UPDATE servers SET status = ?, description = ?, announcement = ?, staff_role_id = ?, discord_synced_at = NULL WHERE id = ?"
-          ).bind(status, description, announcement, staffRoleId, serverId).run();
+            "UPDATE servers SET status = ?, description = ?, announcement = ?, staff_role_id = ?, whitelisted_role_id = ?, discord_synced_at = NULL WHERE id = ?"
+          ).bind(status, description, announcement, staffRoleId, whitelistedRoleId, serverId).run();
           return json({ success: true }, 200, origin);
         }
       }
