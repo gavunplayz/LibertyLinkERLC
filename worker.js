@@ -62,6 +62,58 @@ async function verify(token, secret) {
   return payload;
 }
 
+
+async function discordBotFetch(env, path) {
+  if (!env.DISCORD_BOT_TOKEN) throw new Error("Discord bot token is not configured in the Worker.");
+  const response = await fetch("https://discord.com/api/v10" + path, {
+    headers: { Authorization: "Bot " + env.DISCORD_BOT_TOKEN }
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error("Discord API " + response.status + ": " + detail.slice(0, 180));
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+async function getDiscordMember(env, guildId, userId) {
+  try {
+    return await discordBotFetch(env, "/guilds/" + encodeURIComponent(guildId) + "/members/" + encodeURIComponent(userId));
+  } catch (error) {
+    if (String(error.message).includes("404")) return null;
+    throw error;
+  }
+}
+
+async function refreshDiscordCounts(env, server) {
+  if (!env.DISCORD_BOT_TOKEN) return server;
+  const synced = server.discord_synced_at ? Date.parse(server.discord_synced_at) : 0;
+  if (synced && Date.now() - synced < 5 * 60 * 1000) return server;
+  try {
+    const guild = await discordBotFetch(env, "/guilds/" + encodeURIComponent(server.discord_guild_id) + "?with_counts=true");
+    let staffCount = 0;
+    if (server.staff_role_id) {
+      let after = "0";
+      while (true) {
+        const members = await discordBotFetch(env, "/guilds/" + encodeURIComponent(server.discord_guild_id) + "/members?limit=1000&after=" + after);
+        if (!Array.isArray(members) || members.length === 0) break;
+        for (const member of members) {
+          if (Array.isArray(member.roles) && member.roles.includes(server.staff_role_id)) staffCount++;
+        }
+        after = members[members.length - 1].user.id;
+        if (members.length < 1000) break;
+      }
+    }
+    const memberCount = Number(guild.approximate_member_count || 0);
+    const syncedAt = new Date().toISOString();
+    await env.DB.prepare("UPDATE servers SET staff_count = ?, discord_member_count = ?, discord_synced_at = ? WHERE id = ?")
+      .bind(staffCount, memberCount, syncedAt, server.id).run();
+    return { ...server, staff_count: staffCount, discord_member_count: memberCount, discord_synced_at: syncedAt };
+  } catch (error) {
+    console.error("Discord count sync failed:", error);
+    return server;
+  }
+}
+
 function getCookie(request, name) {
   const cookie = request.headers.get("Cookie") || "";
   const match = cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
@@ -173,10 +225,14 @@ export default {
       if (url.pathname.startsWith("/api/public/") && request.method === "GET") {
         if (!env.DB) return json({ error: "Server database is not connected." }, 503, origin);
         const serverId = url.pathname.split("/").pop();
-        const server = await env.DB.prepare(
-          "SELECT id, name, discord_guild_name, status, staff_count, description, announcement, created_at FROM servers WHERE id = ?"
+        let server = await env.DB.prepare(
+          "SELECT id, name, discord_guild_id, discord_guild_name, status, staff_count, discord_member_count, description, announcement, created_at, staff_role_id, discord_synced_at FROM servers WHERE id = ?"
         ).bind(serverId).first();
         if (!server) return json({ error: "Server not found." }, 404, origin);
+        server = await refreshDiscordCounts(env, server);
+        delete server.discord_guild_id;
+        delete server.staff_role_id;
+        delete server.discord_synced_at;
         return json({ server }, 200, origin);
       }
       const authorization = request.headers.get("Authorization") || "";
@@ -191,25 +247,64 @@ export default {
       const staffMatch = url.pathname.match(/^\/api\/staff\/([a-f0-9-]+)$/i);
       if (staffMatch) {
         const serverId = staffMatch[1];
-        const membership = await env.DB.prepare(
-          "SELECT m.role, s.id, s.name, s.status, s.staff_count, s.description, s.announcement, s.discord_guild_name FROM memberships m JOIN servers s ON s.id = m.server_id WHERE m.server_id = ? AND m.user_id = ?"
-        ).bind(serverId, user.sub).first();
-        if (!membership || !["owner", "staff"].includes(membership.role)) {
-          return json({ error: "You need server staff permissions to access this page." }, 403, origin);
+        let server = await env.DB.prepare(
+          "SELECT id, name, owner_user_id, discord_guild_id, status, staff_count, discord_member_count, description, announcement, discord_guild_name, staff_role_id, discord_synced_at FROM servers WHERE id = ?"
+        ).bind(serverId).first();
+        if (!server) return json({ error: "Server not found." }, 404, origin);
+        const isOwner = server.owner_user_id === user.sub;
+        let isStaff = false;
+        if (!isOwner && server.staff_role_id && env.DISCORD_BOT_TOKEN) {
+          try {
+            const member = await getDiscordMember(env, server.discord_guild_id, user.sub);
+            isStaff = !!member && Array.isArray(member.roles) && member.roles.includes(server.staff_role_id);
+          } catch (error) {
+            console.error("Staff role verification failed:", error);
+            return json({ error: "We couldn't verify your Discord roles. Please try again shortly." }, 503, origin);
+          }
         }
-        if (request.method === "GET") return json({ server: membership }, 200, origin);
+        if (!isOwner && !isStaff) {
+          return json({ error: "You need the community's configured Discord staff role to access this page." }, 403, origin);
+        }
+        server = await refreshDiscordCounts(env, server);
+        if (request.method === "GET") {
+          let roles = [];
+          if (isOwner) {
+            try {
+              roles = await discordBotFetch(env, "/guilds/" + encodeURIComponent(server.discord_guild_id) + "/roles");
+              roles = roles.filter(role => !role.managed && role.name !== "@everyone")
+                .map(role => ({ id: role.id, name: role.name, position: role.position }));
+              roles.sort((a,b) => b.position-a.position);
+            } catch (error) {
+              console.error("Could not load Discord roles:", error);
+              return json({ error: "Could not load Discord roles. Make sure the Liberty Link bot is in this server." }, 503, origin);
+            }
+          }
+          delete server.discord_guild_id;
+          delete server.owner_user_id;
+          delete server.discord_synced_at;
+          return json({ server, is_owner: isOwner, roles }, 200, origin);
+        }
         if (request.method === "PATCH") {
           let body;
           try { body = await request.json(); } catch { return json({ error: "Invalid request body." }, 400, origin); }
           const status = String(body.status || "").toLowerCase();
-          const staffCount = Number(body.staff_count);
           const description = String(body.description || "").trim().slice(0, 500);
           const announcement = String(body.announcement || "").trim().slice(0, 300);
           if (!["online", "offline"].includes(status)) return json({ error: "Choose online or offline status." }, 400, origin);
-          if (!Number.isInteger(staffCount) || staffCount < 0 || staffCount > 100000) return json({ error: "Staff count must be a whole number from 0 to 100000." }, 400, origin);
+          let staffRoleId = server.staff_role_id;
+          if (Object.prototype.hasOwnProperty.call(body, "staff_role_id")) {
+            if (!isOwner) return json({ error: "Only the community owner can change the staff role." }, 403, origin);
+            staffRoleId = String(body.staff_role_id || "") || null;
+            if (staffRoleId) {
+              const roles = await discordBotFetch(env, "/guilds/" + encodeURIComponent(server.discord_guild_id) + "/roles");
+              if (!roles.some(role => role.id === staffRoleId && !role.managed && role.name !== "@everyone")) {
+                return json({ error: "Choose a valid role from this Discord server." }, 400, origin);
+              }
+            }
+          }
           await env.DB.prepare(
-            "UPDATE servers SET status = ?, staff_count = ?, description = ?, announcement = ? WHERE id = ?"
-          ).bind(status, staffCount, description, announcement, serverId).run();
+            "UPDATE servers SET status = ?, description = ?, announcement = ?, staff_role_id = ?, discord_synced_at = NULL WHERE id = ?"
+          ).bind(status, description, announcement, staffRoleId, serverId).run();
           return json({ success: true }, 200, origin);
         }
       }
