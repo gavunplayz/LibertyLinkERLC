@@ -192,7 +192,7 @@ async function loadServers() {
       publicLink.textContent = "View public page ↗";
       publicLink.className = "server-page-link";
       card.append(name, discord, role, publicLink);
-      if (server.role === "owner" || server.role === "staff") {
+      if (true) {
         const staffLink = document.createElement("a");
         staffLink.href = "?server=" + encodeURIComponent(server.id) + "&view=staff";
         staffLink.textContent = "Open staff page →";
@@ -297,6 +297,7 @@ async function loadServerPage() {
     status.className = "server-status " + (server.status === "online" ? "is-online" : "is-offline");
     description.textContent = server.description || "This community hasn't added a description yet.";
     staffCount.textContent = String(server.staff_count ?? 0);
+    if (memberCount) memberCount.textContent = String(server.discord_member_count ?? 0);
     announcement.textContent = server.announcement || "No current announcements.";
     document.title = server.name + " — Liberty Link";
     document.getElementById("server-public-link").href = "?server=" + encodeURIComponent(pageServerId);
@@ -313,7 +314,16 @@ async function loadStaffPage() {
     const data = await api("/api/staff/" + encodeURIComponent(pageServerId));
     const server = data.server;
     document.getElementById("staff-status").value = server.status;
-    document.getElementById("staff-count").value = server.staff_count ?? 0;
+    const roleSetting = document.getElementById("staff-role-setting");
+    const roleSelect = document.getElementById("staff-role");
+    if (data.is_owner) {
+      roleSetting.hidden = false;
+      roleSelect.innerHTML = '<option value="">No staff role selected</option>';
+      data.roles.forEach(role => roleSelect.add(new Option(role.name, role.id)));
+      roleSelect.value = server.staff_role_id || "";
+    } else {
+      roleSetting.hidden = true;
+    }
     document.getElementById("staff-description").value = server.description || "";
     document.getElementById("staff-announcement").value = server.announcement || "";
     document.getElementById("staff-save-message").textContent = "Staff access verified.";
