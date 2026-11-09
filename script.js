@@ -288,6 +288,7 @@ async function loadServerPage() {
   const status = document.getElementById("server-page-status");
   const description = document.getElementById("server-page-description");
   const staffCount = document.getElementById("server-page-staff-count");
+  const memberCount = document.getElementById("server-page-member-count");
   const announcement = document.getElementById("server-page-announcement");
   try {
     const data = await api("/api/public/" + encodeURIComponent(pageServerId));
@@ -343,7 +344,7 @@ document.getElementById("staff-settings-form")?.addEventListener("submit", async
       method: "PATCH",
       body: JSON.stringify({
         status: document.getElementById("staff-status").value,
-        staff_count: Number(document.getElementById("staff-count").value),
+        ...(document.getElementById("staff-role-setting").hidden ? {} : { staff_role_id: document.getElementById("staff-role").value }),
         description: document.getElementById("staff-description").value,
         announcement: document.getElementById("staff-announcement").value
       })
